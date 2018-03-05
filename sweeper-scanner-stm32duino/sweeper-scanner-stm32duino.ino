@@ -10,6 +10,8 @@
 
 #define FREQ_fM 2   // MHZ
 #define PRSK_fM 1
+
+#define FREQ_SH
 const int8_t analogInPin = PB0;   // Analog input pin: any of LQFP44 pins (PORT_PIN), 10 (PA0), 11 (PA1), 12 (PA2), 13 (PA3), 14 (PA4), 15 (PA5), 16 (PA6), 17 (PA7), 18 (PB0), 19  (PB1)
 
 //fM is the master clock and runs on Timer3
@@ -51,34 +53,62 @@ void loop() {
    fM - Master Clock: 0.8 - 4 MHz --> Timer3
   SH - shift gate --> Timer1
   ICG - Integration Clear Gate --> Timer2 generates an isr which starts ADC timer and DMA
-  ADC Timer - Timer4 operates at fM/4
+  ADC Timer - Timer3 operates at fM/4
 */
 void configure_timers() {
-  //Timer 1: Shift gate timer (SH)
+
+  //Timer 1:  Master Clock (fM). Frequency range 0.8-4 Mhz
+
   Timer1.pause();
+  pinMode(PA8, PWM);
+  TIMER1_BASE->CR2  = (TIMER_CR2_MMS_ENABLE); //enable master mode
+  Timer1.setPrescaleFactor(PRSK_fM); //72 MHZ, 13.89 ns period
+  Timer1.setOverflow(FREQ_fM*16 / PRSK_fM - 1);
+  Timer1.setCompare(TIMER_CH1, (FREQ_fM*16 / PRSK_fM - 1) / 2);
+  Timer1.refresh();
+
 
   //Timer 2: Integration Clear Gate (ICG)
+  //ICG must go high with a delay (t1) of minimum 1000 ns after SH goes low.
+  //ICG must go high when fM is high (I’m not sure this is actually needed).
+  //fM (Timer4) is used as a prescaler
   Timer2.pause();
+  pinMode(PA0, PWM);
+  Timer2.setSlaveFlags(TIMER_SMCR_TS_ITR0 | TIMER_SMCR_SMS_TRIGGER);
+  Timer2.setPrescaleFactor(1);
+  Timer2.setOverflow(72);
+  Timer2.setCompare(TIMER_CH1, 36);
+  Timer2.refresh();
 
-  //Timer 3: Master Clock (fM). Frequency range 0.8-4 Mhz
+
+
+  //Timer 3:  Shift gate timer (SH)
+  //SH must go high with a delay (t2) of between 100 and 1000 ns after ICG goes low.
+  //SH must stay high for (t3) a minium of 1000 ns.
+  //fM (Timer1) is used as a prescaler
   Timer3.pause();
   pinMode(PA6, PWM);
-  TIMER3_BASE->CR2  = (TIMER_CR2_MMS_ENABLE); //enable master mode 
-  Timer3.setPrescaleFactor(1); //72 MHZ, 13.89 ns period
-  Timer3.setCompare(TIMER_CH1, 36);
-  Timer3.setOverflow(72);
+  Timer3.setSlaveFlags(TIMER_SMCR_TS_ITR0 | TIMER_SMCR_SMS_TRIGGER);
+  Timer3.setPrescaleFactor(PRSK_fM);
+  Timer3.setOverflow(72 * 6 - 1);
+  Timer3.setCompare(TIMER_CH1, 72);
   Timer3.refresh();
+
+
 
   //Timer 4: ADC Sample Rate. Frequency = fM/4
   //prescaler  =PRSK_fM*4    frequency = FREQ_fM/4
   //slave to Timer3: fM
+  //fM (Timer1) is used as a prescaler
   Timer4.pause();
-  pinMode(PB6, PWM);
-  Timer4.setSlaveFlags(TIMER_SMCR_TS_ITR2 | TIMER_SMCR_SMS_TRIGGER);
-  Timer4.setPrescaleFactor(4); //72 MHZ, 13.89 ns period
-  Timer4.setCompare(TIMER_CH1, 36);
-  Timer4.setOverflow(72);
+  //pinMode(PB6, PWM);
+  Timer4.setSlaveFlags(TIMER_SMCR_TS_ITR0 | TIMER_SMCR_SMS_TRIGGER);
+  Timer4.setPrescaleFactor(PRSK_fM * 4); //72 MHZ, 13.89 ns period
+  Timer4.setCompare(TIMER_CH1, (36 / PRSK_fM - 1) / 2);
+  Timer4.setOverflow(36 / PRSK_fM - 1);
   Timer4.refresh();
+
+
 
   //Let the Timers run
   Timer1.resume();
