@@ -21,6 +21,7 @@ void configure_timers() {
   const int t4 = 20 * 72 / 1000;
   const int n_samples = 5;
 
+
   Timer2.pause();
   pinMode(PA0, PWM);
   TIMER2_BASE->SMCR = (TIMER_SMCR_SMS_TRIGGER | TIMER_SMCR_TS_ITR2 );
