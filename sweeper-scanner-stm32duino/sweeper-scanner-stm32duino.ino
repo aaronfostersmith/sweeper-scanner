@@ -1,9 +1,4 @@
 /*
-  fM - Master Clock: 0.8 - 4 MHz --> Timer3
-  SH - shift gate --> Timer1
-  ICG - Integration Clear Gate --> Timer2 generates an isr which starts ADC timer and DMA
-  ADC must match data rate = fM/4 --> Timer4 used as external interrupt for ADC
-
   resources: https://github.com/pingumacpenguin/STM32-O-Scope
            https://tcd1304.wordpress.com/
 */
@@ -56,13 +51,13 @@ void loop() {
   ADC Timer - Timer3 operates at fM/4
 */
 void configure_timers() {
-  const int t_int = 4000 * 72 / 1000; //4 us
-  const int t1 = 1000 * 72 / 1000;
-  const int t2 = 100 * 72 / 1000;
+  const int t_int = 20* 72; //10 us
+  const int t1 = 1 * 72;
+  const int t2 = 1/10 * 72;
   const int t3 = t_int / 2;
-  const int t4 = 20 * 72 / 1000;
-  const int n_samples = 3694;
-  const int PRSK_ICG = 18;
+  const int t4 = 2/ 100 * 72 ;
+  const int n_samples = 3694/4;
+  const int PRSK_ICG = 45;
 
   //Timer 1:  Master Clock (fM). Frequency range 0.8-4 Mhz
   Timer1.pause();
@@ -116,7 +111,7 @@ void configure_timers() {
 */
 
   //preload slave timers to get timing right
-  TIMER2_BASE -> CNT = ( t3+t1-t_int/2)/PRSK_ICG;//t_int/2 is 90 deg phase shift for sh
+  TIMER2_BASE -> CNT = 6;//( t3+t1-t_int/2)/PRSK_ICG;//t_int/2 is 90 deg phase shift for sh
   TIMER3_BASE -> CNT = 0;
 
 
